@@ -1,0 +1,52 @@
+name: Gravador Automático de Lives
+
+on:
+  schedule:
+    # Roda a cada 20 minutos, das 17h às 01h UTC (que equivale das 14h às 22h no Horário de Brasília)
+    - cron: '*/20 17-23,0 * * *'
+  workflow_dispatch: # Permite que você clique no botão para testar manualmente quando quiser
+
+jobs:
+  gravar_live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # Tempo máximo que o servidor do GitHub pode passar gravando (6 horas)
+
+    steps:
+    - name: Configurar Fuso Horário Brasil
+      run: sudo timedatectl set-timezone America/Sao_Paulo
+
+    - name: Instalar Streamlink e Rclone
+      run: |
+        sudo apt-get update
+        sudo apt-get install streamlink rclone -y
+
+    - name: Configurar o Google Drive (Rclone)
+      run: |
+        mkdir -p ~/.config/rclone
+        echo '[gdrive]' > ~/.config/rclone/rclone.conf
+        echo 'type = drive' >> ~/.config/rclone/rclone.conf
+        echo 'scope = drive' >> ~/.config/rclone/rclone.conf
+        echo 'token = '"'${{ secrets.RCLONE_CONFIG_DATA }}'"'' >> ~/.config/rclone/rclone.conf
+
+    - name: Verificar e Gravar a Live
+      run: |
+        # Configuração do alvo
+        STREAMER="snopey"
+        
+        echo "Checando se o canal $STREAMER está ao vivo..."
+        
+        # Cria o nome do arquivo com o nome do streamer, data e hora atual do Brasil
+        FILENAME="${STREAMER}_$(date +'%Y%m%d_%H%M%S').mp4"
+        
+        # O Streamlink tenta gravar a live na melhor qualidade (1080p se disponível).
+        # Se o streamer estiver offline, o comando fecha em segundos sem quebrar o robô.
+        streamlink twitch.tv/$STREAMER best -o "$FILENAME" || true
+
+        # Se o arquivo de vídeo foi criado, significa que a live estava online e foi gravada!
+        if [ -f "$FILENAME" ]; then
+          echo "Live gravada com sucesso! Enviando para o Google Drive..."
+          # Envia o arquivo para uma pasta chamada "Lives_Gravadas" no seu Google Drive e apaga do GitHub
+          rclone move "$FILENAME" gdrive:Lives_Gravadas --progress
+        else
+          echo "O streamer $STREAMER está offline. Nada para gravar."
+        fi
