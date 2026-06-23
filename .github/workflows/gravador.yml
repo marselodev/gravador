@@ -2,51 +2,42 @@ name: Gravador Automático de Lives
 
 on:
   schedule:
-    # Roda a cada 20 minutos, das 17h às 01h UTC (que equivale das 14h às 22h no Horário de Brasília)
-    - cron: '*/20 17-23,0 * * *'
-  workflow_dispatch: # Permite que você clique no botão para testar manualmente quando quiser
+    - cron: '*/20 17-23 * * *' # Mantém a checagem automática de 20 em 20 min
+  workflow_dispatch: # Mantém o botão para você iniciar manualmente quando quiser
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # Tempo máximo que o servidor do GitHub pode passar gravando (6 horas)
 
     steps:
-    - name: Configurar Fuso Horário Brasil
-      run: sudo timedatectl set-timezone America/Sao_Paulo
+      - name: Checkout do Código
+        uses: actions/checkout@v3
 
-    - name: Instalar Streamlink e Rclone
-      run: |
-        sudo apt-get update
-        sudo apt-get install streamlink rclone -y
+      - name: Configurar Fuso Horário Brasil
+        run: sudo timedatectl set-timezone America/Sao_Paulo
 
-    - name: Configurar o Google Drive (Rclone)
-      run: |
-        mkdir -p ~/.config/rclone
-        echo '[gdrive]' > ~/.config/rclone/rclone.conf
-        echo 'type = drive' >> ~/.config/rclone/rclone.conf
-        echo 'scope = drive' >> ~/.config/rclone/rclone.conf
-        echo 'token = '"'${{ secrets.RCLONE_CONFIG_DATA }}'"'' >> ~/.config/rclone/rclone.conf
+      - name: Instalar Streamlink e Rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y streamlink rclone
 
-    - name: Verificar e Gravar a Live
-      run: |
-        # Configuração do alvo
-        STREAMER="snopey"
-        
-        echo "Checando se o canal $STREAMER está ao vivo..."
-        
-        # Cria o nome do arquivo com o nome do streamer, data e hora atual do Brasil
-        FILENAME="${STREAMER}_$(date +'%Y%m%d_%H%M%S').mp4"
-        
-        # O Streamlink tenta gravar a live na melhor qualidade (1080p se disponível).
-        # Se o streamer estiver offline, o comando fecha em segundos sem quebrar o robô.
-        streamlink twitch.tv/$STREAMER best -o "$FILENAME" || true
+      - name: Configurar o Google Drive (Rclone)
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG_DATA }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-        # Se o arquivo de vídeo foi criado, significa que a live estava online e foi gravada!
-        if [ -f "$FILENAME" ]; then
-          echo "Live gravada com sucesso! Enviando para o Google Drive..."
-          # Envia o arquivo para uma pasta chamada "Lives_Gravadas" no seu Google Drive e apaga do GitHub
-          rclone move "$FILENAME" gdrive:Lives_Gravadas --progress
-        else
-          echo "O streamer $STREAMER está offline. Nada para gravar."
-        fi
+      - name: Verificar e Gravar a Live
+        run: |
+          echo "Checando se o canal snopey está ao vivo..."
+          streamlink twitch.tv/snopey best -o "snopey_$(date +%Y%m%d_%H%M%S).mp4"
+
+      - name: Enviar para o Google Drive
+        if: always() # <--- O SEGREDO ESTÁ AQUI! Força o upload mesmo que a live caia e dê erro
+        run: |
+          echo "Iniciando upload dos arquivos salvos..."
+          if ls *.mp4 1> /dev/null 2>&1; then
+            rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
+            echo "Upload concluído com sucesso!"
+          else
+            echo "Nenhum arquivo de vídeo encontrado para enviar."
+          fi
