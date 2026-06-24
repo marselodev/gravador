@@ -4,12 +4,12 @@ on:
   schedule:
     # Roda a cada 20 minutos, das 17h às 01h UTC (das 14h às 22h no Horário de Brasília)
     - cron: '*/20 17-23,0 * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Permite rodar manualmente clicando no botão
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 360 # Tempo máximo de gravação (6 horas)
 
     steps:
       - name: Checkout do Código
@@ -32,8 +32,8 @@ jobs:
 
       - name: Verificar e Gravar a Live
         run: |
-          echo "Checando se o canal emi_mge7 está ao vivo..."
-          streamlink twitch.tv/emi_mge7 best --twitch-disable-hosting -o "emi_mge7_$(date +%Y%m%d_%H%M%S).mp4" || true
+          echo "Checando se o canal 1crocs está ao vivo..."
+          streamlink twitch.tv/1crocs best --twitch-disable-hosting --twitch-low-latency -o "1crocs_$(date +%Y%m%d_%H%M%S).mp4" || true
 
       - name: Enviar para o Google Drive
         if: always()
