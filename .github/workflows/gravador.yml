@@ -2,14 +2,14 @@ name: Gravador Automático de Lives
 
 on:
   schedule:
-    # Roda a cada 20 minutos, das 17h às 01h UTC (que equivale das 14h às 22h no Horário de Brasília)
+    # Roda a cada 20 minutos, das 17h às 01h UTC (das 14h às 22h no Horário de Brasília)
     - cron: '*/20 17-23,0 * * *'
-  workflow_dispatch: # Permite que você clique no botão para testar manualmente quando quiser
+  workflow_dispatch: # Permite rodar manualmente clicando no botão
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # Tempo máximo que o servidor do GitHub pode passar gravando (6 horas)
+    timeout-minutes: 360 # Tempo máximo de gravação (6 horas)
 
     steps:
       - name: Checkout do Código
@@ -26,11 +26,7 @@ jobs:
       - name: Configurar o Google Drive (Rclone)
         run: |
           mkdir -p ~/.config/rclone
-          echo "[gdrive]" > ~/.config/rclone/rclone.conf
-          echo "type = drive" >> ~/.config/rclone/rclone.conf
-          echo "scope = drive" >> ~/.config/rclone/rclone.conf
-          echo -n "token = " >> ~/.config/rclone/rclone.conf
-          echo "${{ secrets.RCLONE_CONFIG_DATA }}" | base64 -d >> ~/.config/rclone/rclone.conf
+          echo "${{ secrets.RCLONE_CONFIG_DATA }}" > ~/.config/rclone/rclone.conf
 
       - name: Verificar e Gravar a Live
         run: |
