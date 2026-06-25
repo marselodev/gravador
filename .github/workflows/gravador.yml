@@ -18,10 +18,11 @@ jobs:
       - name: Configurar Fuso Horário Brasil
         run: sudo timedatectl set-timezone America/Sao_Paulo
 
-      - name: Instalar Streamlink e Rclone
+      - name: Instalar Dependências e Streamlink Atualizado
         run: |
           sudo apt-get update
-          sudo apt-get install -y streamlink rclone
+          sudo apt-get install -y rclone python3-pip python3-setuptools
+          pip3 install --upgrade streamlink
 
       - name: Configurar o Google Drive (Rclone)
         run: |
@@ -32,8 +33,8 @@ jobs:
 
       - name: Verificar e Gravar a Live
         run: |
-          echo "Checando se o canal snopey está ao vivo..."
-          streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_$(date +%Y%m%d_%H%M%S).mp4" || true
+          echo "Checando se o canal oantunesz está ao vivo..."
+          streamlink twitch.tv/oantunesz best --twitch-disable-hosting --twitch-low-latency -o "oantunesz_$(date +%Y%m%d_%H%M%S).mp4" || true
 
       - name: Enviar para o Google Drive
         if: always()
