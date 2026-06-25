@@ -34,9 +34,9 @@ jobs:
 
       - name: Verificar e Gravar a Live Inteira
         run: |
-          echo "Checando se o canal marselu1 está ao vivo..."
+          echo "Checando se o canal snopey está ao vivo..."
           # O Streamlink grava a live inteira e só encerra o comando quando o streamer der "Offline"
-          streamlink twitch.tv/marselu1 best --twitch-disable-hosting --twitch-low-latency -o "marselu1_$(date +%Y%m%d_%H%M%S).mp4" || true
+          streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_$(date +%Y%m%d_%H%M%S).mp4" || true
 
       - name: Enviar para o Google Drive
         if: always()
