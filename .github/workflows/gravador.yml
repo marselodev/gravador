@@ -5,38 +5,16 @@ on:
     # Roda a cada 20 minutos, das 17h às 01h UTC (das 14h às 22h no Horário de Brasília)
     - cron: '*/20 17-23,0 * * *'
   workflow_dispatch:
-    inputs:
-      acao:
-        description: 'Selecione "parar" para encerrar a gravação atual e enviar para o Drive'
-        required: false
-        default: 'iniciar'
-        type: choice
-        options:
-          - iniciar
-          - parar
+    # Permite que o senhor inicie a gravação manualmente pelo botão se quiser
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # Tempo máximo de gravação (6 horas)
+    timeout-minutes: 360 # Tempo máximo de gravação contínua (6 horas)
 
     steps:
       - name: Checkout do Código
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tratar Comando de Parada Manual
-        if: github.event.inputs.acao == 'parar'
-        run: |
-          echo "Solicitando interrupção da gravação ativa..."
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          touch PARAR_GRAVACAO
-          git add PARAR_GRAVACAO
-          git commit -m "Parar gravação ativa [skip ci]" || true
-          git push || true
-          exit 0
 
       - name: Configurar Fuso Horário Brasil
         run: sudo timedatectl set-timezone America/Sao_Paulo
@@ -54,48 +32,22 @@ jobs:
           ${{ secrets.RCLONE_CONFIG_DATA }}
           EOF
 
-      - name: Verificar e Gravar a Live
+      - name: Verificar e Gravar a Live Inteira
         run: |
-          echo "Checando se o canal oantunesz está ao vivo..."
-          
-          # Remove arquivo de parada antigo se existir
-          rm -f PARAR_GRAVACAO
-          
-          # Inicia a gravação em segundo plano
-          streamlink twitch.tv/oantunesz best --twitch-disable-hosting --twitch-low-latency -o "oantunesz_$(date +%Y%m%d_%H%M%S).mp4" &
-          STREAMLINK_PID=$!
-          
-          # Loop de monitoramento: checa a cada 10 segundos se o comando "parar" foi enviado
-          while kill -0 $STREAMLINK_PID 2>/dev/null; do
-            git fetch origin main &>/dev/null || true
-            if git log origin/main -1 | grep -q "Parar gravação ativa"; then
-              echo "Comando de parada detectado no repositório! Encerrando o Streamlink de forma limpa..."
-              kill -2 $STREAMLINK_PID
-              
-              # Limpa o comando de parada para a próxima live
-              git config --global user.name "GitHub Actions"
-              git config --global user.email "actions@github.com"
-              git rm PARAR_GRAVACAO || true
-              git commit -m "Limpar comando de parada [skip ci]" || true
-              git push || true
-              break
-            fi
-            sleep 10
-          done
-          
-          # Aguarda o Streamlink fechar o arquivo MP4 completamente
-          wait $STREAMLINK_PID || true
+          echo "Checando se o canal marselu1 está ao vivo..."
+          # O Streamlink grava a live inteira e só encerra o comando quando o streamer der "Offline"
+          streamlink twitch.tv/marselu1 best --twitch-disable-hosting --twitch-low-latency -o "marselu1_$(date +%Y%m%d_%H%M%S).mp4" || true
 
       - name: Enviar para o Google Drive
         if: always()
         run: |
-          echo "Aguardando o arquivo fechar totalmente..."
+          echo "Aguardando 5 segundos para o arquivo fechar totalmente..."
           sleep 5
-          echo "Iniciando upload dos arquivos salvos..."
+          echo "Iniciando upload do vídeo salvo..."
           if ls *.mp4 1> /dev/null 2>&1; then
             rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
-            echo "Upload concluído com sucesso!"
+            echo "Upload concluído com sucesso, mestre!"
             rm -f *.mp4
           else
-            echo "Nenhum arquivo de vídeo encontrado para enviar."
+            echo "Nenhum arquivo de vídeo encontrado (o canal deveria estar offline)."
           fi
