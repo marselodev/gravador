@@ -4,7 +4,16 @@ on:
   schedule:
     # Roda a cada 20 minutos, das 17h às 01h UTC (das 14h às 22h no Horário de Brasília)
     - cron: '*/20 17-23,0 * * *'
-  workflow_dispatch: # Permite rodar manualmente clicando no botão
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: 'Selecione "parar" para encerrar a gravação atual e enviar para o Drive'
+        required: false
+        default: 'iniciar'
+        type: choice
+        options:
+          - iniciar
+          - parar
 
 jobs:
   gravar_live:
@@ -14,6 +23,13 @@ jobs:
     steps:
       - name: Checkout do Código
         uses: actions/checkout@v3
+
+      - name: Tratar Comando de Parada Manual
+        if: github.event.inputs.acao == 'parar'
+        run: |
+          echo "Comando de parada recebido! Encerrando gravações ativas..."
+          pkill -f streamlink || true
+          exit 0
 
       - name: Configurar Fuso Horário Brasil
         run: sudo timedatectl set-timezone America/Sao_Paulo
@@ -39,6 +55,8 @@ jobs:
       - name: Enviar para o Google Drive
         if: always()
         run: |
+          echo "Aguardando 3 segundos para o arquivo fechar totalmente..."
+          sleep 3
           echo "Iniciando upload dos arquivos salvos..."
           if ls *.mp4 1> /dev/null 2>&1; then
             rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
