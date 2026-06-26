@@ -2,10 +2,11 @@ name: Gravador Automático de Lives
 
 on:
   schedule:
-    # Roda a cada 20 minutos, as 24 horas do dia, sem perder nenhuma live
-    - cron: '*/20 * * * *'
+    # Roda a cada 30 minutos (:00 e :30), das 17h às 23h59 UTC
+    # No Horário de Brasília, isso dá exatamente das 14h00 às 20h30 (última checagem do turno)
+    - cron: '0,30 17-23 * * *'
   workflow_dispatch:
-    # Permite que o senhor inicie a gravação manualmente pelo botão se quiser
+    # Permite iniciar a gravação manualmente pelo botão se você quiser
 
 jobs:
   gravar_live:
@@ -46,7 +47,7 @@ jobs:
           echo "Iniciando upload do vídeo salvo..."
           if ls *.mp4 1> /dev/null 2>&1; then
             rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
-            echo "Upload concluído com sucesso, mestre!"
+            echo "Upload concluído com sucesso!"
             rm -f *.mp4
           else
             echo "Nenhum arquivo de vídeo encontrado (o canal deveria estar offline)."
