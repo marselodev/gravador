@@ -2,8 +2,8 @@ name: Gravador Automático de Lives
 
 on:
   schedule:
-    # Roda a cada 20 minutos, das 17h às 01h UTC (das 14h às 22h no Horário de Brasília)
-    - cron: '*/20 17-23,0 * * *'
+    # Roda a cada 20 minutos, as 24 horas do dia, sem perder nenhuma live
+    - cron: '*/20 * * * *'
   workflow_dispatch:
     # Permite que o senhor inicie a gravação manualmente pelo botão se quiser
 
