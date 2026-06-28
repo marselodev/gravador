@@ -1,17 +1,20 @@
-name: Gravador Automático de Lives
+name: Gravador Automático de Lives 24h
 
 on:
   schedule:
-    # Roda a cada 30 minutos (:00 e :30), das 17h às 23h59 UTC
-    # No Horário de Brasília, isso dá exatamente das 14h00 às 20h30 (última checagem do turno)
-    - cron: '0,30 17-23 * * *'
+    # Roda a cada 15 minutos, o dia inteiro, para garantir que o robô pegue a live assim que começar
+    - cron: '*/15 * * * *'
   workflow_dispatch:
-    # Permite iniciar a gravação manualmente pelo botão se você quiser
+
+# Trava de segurança: impede que um robô atrapalhe o outro se a live durar muitas horas
+concurrency:
+  group: gravador-snopey
+  cancel-in-progress: false
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # Tempo máximo de gravação contínua (6 horas)
+    timeout-minutes: 350 # Tempo máximo seguro para cada execução no GitHub
 
     steps:
       - name: Checkout do Código
@@ -36,19 +39,24 @@ jobs:
       - name: Verificar e Gravar a Live Inteira
         run: |
           echo "Checando se o canal snopey está ao vivo..."
-          # O Streamlink grava a live inteira e só encerra o comando quando o streamer der "Offline"
-          streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_$(date +%Y%m%d_%H%M%S).mp4" || true
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          
+          # Executa o Streamlink. Ele vai gravar a live do início ao fim e só para quando o streamer ficar offline.
+          streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${TIMESTAMP}.mp4" || true
 
       - name: Enviar para o Google Drive
         if: always()
         run: |
           echo "Aguardando 5 segundos para o arquivo fechar totalmente..."
           sleep 5
-          echo "Iniciando upload do vídeo salvo..."
-          if ls *.mp4 1> /dev/null 2>&1; then
+          
+          # Verifica se o arquivo existe e se NÃO está zerado (evita enviar arquivos fantasmas de quando o canal tá offline)
+          if [ -f *.mp4 ] && [ -s *.mp4 ]; then
+            echo "Iniciando upload do vídeo salvo..."
             rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
             echo "Upload concluído com sucesso!"
             rm -f *.mp4
           else
-            echo "Nenhum arquivo de vídeo encontrado (o canal deveria estar offline)."
+            echo "Nenhum arquivo de vídeo real encontrado (o canal estava offline)."
+            rm -f *.mp4 # Limpa qualquer arquivo vazio que tenha sido criado
           fi
