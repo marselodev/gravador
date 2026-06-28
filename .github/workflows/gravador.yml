@@ -1,20 +1,15 @@
-name: Gravador Automático de Lives 24h
+name: Gravador Seguro por Blocos 24h (MP4)
 
 on:
   schedule:
-    # Roda a cada 15 minutos, o dia inteiro, para garantir que o robô pegue a live assim que começar
+    # Roda a cada 15 minutos, o dia inteiro, para checar e pegar a live sempre do começo
     - cron: '*/15 * * * *'
   workflow_dispatch:
-
-# Trava de segurança: impede que um robô atrapalhe o outro se a live durar muitas horas
-concurrency:
-  group: gravador-snopey
-  cancel-in-progress: false
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 350 # Tempo máximo seguro para cada execução no GitHub
+    timeout-minutes: 350 # Tempo máximo de cada bloco caso a live seja muito longa
 
     steps:
       - name: Checkout do Código
@@ -36,12 +31,12 @@ jobs:
           ${{ secrets.RCLONE_CONFIG_DATA }}
           EOF
 
-      - name: Verificar e Gravar a Live Inteira
+      - name: Verificar e Gravar Bloco da Live (.mp4)
         run: |
           echo "Checando se o canal snopey está ao vivo..."
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           
-          # Executa o Streamlink. Ele vai gravar a live do início ao fim e só para quando o streamer ficar offline.
+          # Grava em .mp4 na qualidade máxima (1080p60fps se disponível)
           streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${TIMESTAMP}.mp4" || true
 
       - name: Enviar para o Google Drive
@@ -50,13 +45,13 @@ jobs:
           echo "Aguardando 5 segundos para o arquivo fechar totalmente..."
           sleep 5
           
-          # Verifica se o arquivo existe e se NÃO está zerado (evita enviar arquivos fantasmas de quando o canal tá offline)
+          # Só envia para o Drive se o arquivo existir e NÃO estiver zerado
           if [ -f *.mp4 ] && [ -s *.mp4 ]; then
-            echo "Iniciando upload do vídeo salvo..."
+            echo "Iniciando upload do bloco de vídeo salvo (.mp4)..."
             rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
             echo "Upload concluído com sucesso!"
             rm -f *.mp4
           else
-            echo "Nenhum arquivo de vídeo real encontrado (o canal estava offline)."
-            rm -f *.mp4 # Limpa qualquer arquivo vazio que tenha sido criado
+            echo "Nenhum arquivo de vídeo real encontrado (canal offline)."
+            rm -f *.mp4
           fi
