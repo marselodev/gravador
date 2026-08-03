@@ -1,15 +1,11 @@
-name: Gravador snopey
+name: Gravador
 
 on:
-  schedule:
-    # Roda a cada 15 minutos, o dia inteiro, para checar e pegar a live sempre do começo
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
   gravar_live:
     runs-on: ubuntu-latest
-    timeout-minutes: 350 # Tempo máximo de cada bloco caso a live seja muito longa
 
     steps:
       - name: Checkout do Código
@@ -18,40 +14,73 @@ jobs:
       - name: Configurar Fuso Horário Brasil
         run: sudo timedatectl set-timezone America/Sao_Paulo
 
-      - name: Instalar Dependências e Streamlink Atualizado
+      - name: Instalar Dependências, Python e Streamlink
         run: |
-          sudo apt-get update
-          sudo apt-get install -y rclone python3-pip python3-setuptools
-          pip3 install --upgrade streamlink
+          sudo apt update
+          sudo apt install -y ffmpeg
+          pip install streamlink requests
 
       - name: Configurar o Google Drive (Rclone)
+        uses: animus-co/setup-rclone@v1
+        with:
+          rclone_config: ${{ secrets.RCLONE_CONFIG }}
+
+      - name: Salvar Script de Gravação do Chat
         run: |
-          mkdir -p ~/.config/rclone
-          cat << 'EOF' > ~/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG_DATA }}
+          cat << 'EOF' > gravador_chat.py
+          import requests
+          import time
+          import json
+          import os
+          from datetime import datetime
+
+          CHANNEL = "rodrigogoes"
+          timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+          filename = f"{CHANNEL}_{timestamp}.json"
+          
+          print(f"Iniciando gravação do chat para {CHANNEL}...")
+          
+          while True:
+              try:
+                  url = f"https://tmi.twitch.tv/group/user/{CHANNEL}/chatters"
+                  response = requests.get(url, timeout=5)
+                  if response.status_code == 200:
+                      data = response.json()
+                  time.sleep(10)
+              except Exception as e:
+                  time.sleep(5)
           EOF
 
-      - name: Verificar e Gravar Bloco da Live (.mp4)
+      - name: gravador
         run: |
-          echo "Checando se o canal snopey está ao vivo..."
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          echo "Iniciando gravador de vídeo (Streamlink)..."
           
-          # Grava em .mp4 na qualidade máxima (1080p60fps se disponível)
-          streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${TIMESTAMP}.mp4" || true
+          # Inicia o streamlink para o canal do Rodrigo Góes salvando o arquivo mp4
+          streamlink --twitch-disable-hosting twitch.tv/rodrigogoes best -o "rodrigogoes_${TIMESTAMP}.mp4" &
+          STREAM_PID=$!
 
-      - name: Enviar para o Google Drive
+          # Loop para monitorar se a live continua online
+          while kill -0 $STREAM_PID 2>/dev/null; do
+            sleep 30
+          done
+
+          echo "A transmissão foi encerrada pelo streamer. Finalizando processos..."
+          wait $STREAM_PID || true
+
+      - name: Enviar Vídeo e Chat para o Google Drive
         if: always()
         run: |
-          echo "Aguardando 5 segundos para o arquivo fechar totalmente..."
+          echo "Aguardando 5 segundos para consolidar os arquivos..."
           sleep 5
           
-          # Só envia para o Drive se o arquivo existir e NÃO estiver zerado
-          if [ -f *.mp4 ] && [ -s *.mp4 ]; then
-            echo "Iniciando upload do bloco de vídeo salvo (.mp4)..."
-            rclone copy . gdrive:Lives_Gravadas --include "*.mp4" -v
-            echo "Upload concluído com sucesso!"
-            rm -f *.mp4
+          # Procura por arquivos mp4 ou json em todo o workspace do github
+          if find . -name "*.mp4" -o -name "*.json" | grep -q .; then
+            echo "Arquivos encontrados! Enviando para o Google Drive..."
+            rclone copy . gdrive:Lives_Gravadas --include "*.mp4" --include "*.json" -v --max-depth 2
+            echo "Upload para o Drive concluído com sucesso!"
           else
-            echo "Nenhum arquivo de vídeo real encontrado (canal offline)."
-            rm -f *.mp4
+            echo "Aviso: Nenhum arquivo de vídeo ou chat foi localizado para envio."
           fi
+
+          rm -f *.mp4 *.json gravador_chat.py
