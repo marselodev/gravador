@@ -38,7 +38,7 @@ jobs:
           import os
           from datetime import datetime
 
-          CHANNEL = "rodrigogoes"
+          CHANNEL = "marselu1"
           timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
           filename = f"{CHANNEL}_{timestamp}.json"
           
@@ -60,8 +60,8 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           echo "Iniciando gravador de vídeo (Streamlink)..."
           
-          # Inicia o streamlink para o canal do Rodrigo Góes salvando o arquivo mp4
-          streamlink --twitch-disable-hosting twitch.tv/rodrigogoes best -o "rodrigogoes_${TIMESTAMP}.mp4" &
+          # Inicia o streamlink para o seu canal salvando o arquivo mp4
+          streamlink --twitch-disable-hosting twitch.tv/marselu1 best -o "marselu1_${TIMESTAMP}.mp4" &
           STREAM_PID=$!
 
           # Loop para monitorar se a live continua online
