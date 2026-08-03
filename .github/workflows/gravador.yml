@@ -25,9 +25,11 @@ jobs:
           # Instala o rclone oficialmente via script do desenvolvedor
           curl https://rclone.org/install.sh | sudo bash
           
-          # Cria a pasta de configuração do rclone e injeta o secret
+          # Cria a pasta de configuração e usa o secret correto do seu painel
           mkdir -p ~/.config/rclone
-          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          cat << 'EOF' > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG_DATA }}
+          EOF
 
       - name: Salvar Script de Gravação do Chat
         run: |
