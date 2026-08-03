@@ -17,13 +17,17 @@ jobs:
       - name: Instalar Dependências, Python e Streamlink
         run: |
           sudo apt update
-          sudo apt install -y ffmpeg
+          sudo apt install -y ffmpeg curl unzip
           pip install streamlink requests
 
       - name: Configurar o Google Drive (Rclone)
-        uses: animus-co/setup-rclone@v1
-        with:
-          rclone_config: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          # Instala o rclone oficialmente via script do desenvolvedor
+          curl https://rclone.org/install.sh | sudo bash
+          
+          # Cria a pasta de configuração do rclone e injeta o secret
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
 
       - name: Salvar Script de Gravação do Chat
         run: |
@@ -51,7 +55,7 @@ jobs:
                   time.sleep(5)
           EOF
 
-      - name: gravador
+      - name: Iniciar Gravação Até a Live Acabar
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           echo "Iniciando gravador de vídeo (Streamlink)..."
