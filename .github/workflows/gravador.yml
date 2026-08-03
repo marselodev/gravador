@@ -1,5 +1,4 @@
-name: Gravador marselu1 Completo (Até a Live Desligar)
-
+name: Gravador 
 on:
   schedule:
     - cron: '*/15 * * * *'
@@ -241,12 +240,12 @@ jobs:
           echo "Aguardando 5 segundos para consolidar os arquivos..."
           sleep 5
           
-          if ls *.mp4 *.json 1> /dev/null 2>&1; then
-            echo "Enviando arquivo final da live para o Google Drive..."
+          if find . -maxdepth 1 -name "*.mp4" -o -name "*.json" | grep -q .; then
+            echo "Arquivos encontrados! Enviando para o Google Drive..."
             rclone copy . gdrive:Lives_Gravadas --include "*.mp4" --include "*.json" -v
             echo "Upload para o Drive concluído com sucesso!"
           else
-            echo "Nenhum arquivo gerado (canal estava offline)."
+            echo "Nenhum arquivo de vídeo ou chat foi gerado."
           fi
 
           rm -f *.mp4 *.json gravador_chat.py
