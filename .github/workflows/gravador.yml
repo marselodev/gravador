@@ -1,130 +1,71 @@
-name: Gravador Twitch
+name: Gravador
 
 on:
-  schedule:
-    # Roda a cada 15 minutos, entre 14:00 e 22:59 (Horário de Brasília)
-    - cron: '*/15 17-23,0-1 * * *'
-  workflow_dispatch:
+  schedule:
+    # Roda a cada 15 minutos, entre 14:00 e 22:59 (Horário de Brasília)
+    - cron: '*/15 17-23,0-1 * * *'
+  workflow_dispatch:
 
 # Evita que o GitHub abra duas gravações ao mesmo tempo
 concurrency:
-  group: gravacao_twitch
-  cancel-in-progress: false
+  group: gravacao
+  cancel-in-progress: false
 
 jobs:
-  gravar_tudo:
-    runs-on: ubuntu-latest
-    timeout-minutes: 350
+  gravar_tudo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
 
-    steps:
-      - name: Checkout do Codigo
-        uses: actions/checkout@v4
+    steps:
+      - name: Checkout do Codigo
+        uses: actions/checkout@v4
 
-      - name: Configurar Fuso Horario Brasil
-        run: sudo timedatectl set-timezone America/Sao_Paulo
+      - name: Configurar Fuso Horario Brasil
+        run: sudo timedatectl set-timezone America/Sao_Paulo
 
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Instalar Dependencias (Otimizado)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends rclone ffmpeg
-          pip install --upgrade streamlink google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client websocket-client
+      - name: Instalar Dependencias (Streamlink e Rclone)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone
+          pip install --upgrade streamlink
 
-      - name: Configurar o Google Drive (Rclone)
-        run: |
-          mkdir -p ~/.config/rclone
-          cat << 'EOF' > ~/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG_DATA }}
-          EOF
+      - name: Configurar o Google Drive (Rclone)
+        run: |
+          mkdir -p ~/.config/rclone
+          cat << 'EOF' > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG_DATA }}
+          EOF
 
-      - name: Restaurar Token do YouTube
-        run: |
-          echo '${{ secrets.YOUTUBE_TOKEN }}' > youtube_token.json
+      - name: Gravar Video e Chat Sincronizados
+        run: |
+          echo "Checando se o canal snopey esta ao vivo..."
+          DATA=$(date +%d-%m-%Y)
+          
+          if streamlink twitch.tv/snopey best --stream-url > /dev/null 2>&1; then
+            echo "Canal online! Iniciando gravacao sincronizada..."
+            python gravador3.py &
+            CHAT_PID=$!
+            sleep 3
+            streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${DATA}.mp4"
+            
+            kill -SIGINT $CHAT_PID 2>/dev/null || true
+            sleep 5 
+          else
+            echo "Canal offline. Nenhuma gravacao iniciada."
+          fi
 
-      - name: Gravar Video e Chat Sincronizados
-        run: |
-          echo "Checando se o canal snopey esta ao vivo na Twitch..."
-          DATA=$(date +%d-%m-%Y)
-          
-          if streamlink twitch.tv/snopey best --stream-url > /dev/null 2>&1; then
-            echo "Canal online! Iniciando gravacao sincronizada..."
-            python gravador3.py &
-            CHAT_PID=$!
-            sleep 3
-            streamlink twitch.tv/snopey best --twitch-disable-ads --twitch-low-latency -o "snopey_${DATA}.mp4"
-            
-            kill -SIGINT $CHAT_PID 2>/dev/null || true
-            sleep 5 
-          else
-            echo "Canal offline. Nenhuma gravacao iniciada."
-          fi
-
-      - name: Enviar para o YouTube
-        if: always()
-        run: |
-          if ls *.mp4 1> /dev/null 2>&1; then
-            echo "Enviando vídeo para o YouTube..."
-            python - << 'EOF'
-          import os
-          import glob
-          import json
-          from google.oauth2.credentials import Credentials
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaFileUpload
-
-          videos = glob.glob("*.mp4")
-          if not videos:
-              print("Nenhum arquivo de vídeo encontrado.")
-              exit(0)
-
-          arquivo_video = videos[0]
-
-          with open("youtube_token.json", "r") as f:
-              token_data = json.load(f)
-
-          creds = Credentials(
-              token=token_data.get("token"),
-              refresh_token=token_data.get("refresh_token"),
-              token_uri=token_data.get("token_uri"),
-              client_id=token_data.get("client_id"),
-              client_secret=token_data.get("client_secret"),
-              scopes=token_data.get("scopes")
-          )
-
-          youtube = build("youtube", "v3", credentials=creds)
-
-          body = {
-              "snippet": {
-                  "title": f"Live Twitch - {arquivo_video.replace('.mp4', '')}",
-                  "description": "Live gravada na Twitch e enviada automaticamente via GitHub Actions.",
-                  "categoryId": "20"
-              },
-              "status": {
-                  "privacyStatus": "unlisted"
-              }
-          }
-
-          media = MediaFileUpload(arquivo_video, chunksize=-1, resumable=True)
-          request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-          response = request.execute()
-
-          print("[SUCESSO] Vídeo enviado para o YouTube! ID:", response.get("id"))
-          EOF
-          else
-            echo "Nenhum arquivo de vídeo para enviar ao YouTube."
-          fi
-
-      - name: Enviar Video E Chat para o Google Drive
-        if: always()
-        run: |
-          if ls *.mp4 1> /dev/null 2>&1; then
-            echo "Enviando arquivos para o Google Drive..."
-            rclone copy . gdrive01:Lives_Gravadas --include "*.mp4" --include "*.json" --exclude "youtube_token.json" -v
-            rm -f *.mp4 *.json
-          else
-            echo "Nenhum arquivo para enviar."
-          fi
+      - name: Enviar Video E Chat para o Google Drive
+        if: always()
+        run: |
+          if ls *.mp4 1> /dev/null 2>&1; then
+            echo "Enviando arquivos para o Google Drive..."
+            rclone copy . gdrive01:Lives_Gravadas --include "*.mp4" --include "*.json" -v
+            rm -f *.mp4 *.json
+          else
+            echo "Nenhum arquivo para enviar."
+          fi esse eo da twitch
