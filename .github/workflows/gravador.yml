@@ -23,15 +23,15 @@ jobs:
       - name: Configurar Fuso Horario Brasil
         run: sudo timedatectl set-timezone America/Sao_Paulo
 
-      - name: Configurar Python
+      - name: Configurar Python com Cache
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
-      - name: Instalar Dependencias (Streamlink, Rclone e Google API)
+      - name: Instalar Dependencias (Otimizado)
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y rclone ffmpeg
+          sudo apt-get install -y --no-install-recommends rclone ffmpeg
           pip install --upgrade streamlink google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client websocket-client
 
       - name: Configurar o Google Drive (Rclone)
