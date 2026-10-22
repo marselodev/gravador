@@ -23,14 +23,14 @@ jobs:
       - name: Configurar Fuso Horario Brasil
         run: sudo timedatectl set-timezone America/Sao_Paulo
 
-      - name: Configurar Python com Cache
+      - name: Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Instalar Dependencias (Otimizado)
         run: |
+          sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends rclone ffmpeg
           pip install --upgrade streamlink google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client websocket-client
 
