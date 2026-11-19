@@ -14,7 +14,7 @@ concurrency:
 jobs:
   gravar_tudo:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 60
 
     steps:
       - name: Checkout do Codigo
@@ -47,11 +47,11 @@ jobs:
           DATA=$(date +%d-%m-%Y)
           
           if streamlink twitch.tv/snopey best --stream-url > /dev/null 2>&1; then
-            echo "Canal online! Iniciando gravacao sincronizada..."
+            echo "Canal online! Iniciando gravacao sincronizada (30 min)..."
             python gravador3.py &
             CHAT_PID=$!
             sleep 3
-            streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${DATA}.mp4"
+            timeout -s INT 30m streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${DATA}.mp4" || true
             
             kill -SIGINT $CHAT_PID 2>/dev/null || true
             sleep 5 
