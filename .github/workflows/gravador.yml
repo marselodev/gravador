@@ -43,15 +43,15 @@ jobs:
 
       - name: Gravar Video e Chat Sincronizados
         run: |
-          echo "Checando se o canal snopey esta ao vivo..."
+          echo "Checando se o canal marselu1 esta ao vivo..."
           DATA=$(date +%d-%m-%Y)
           
-          if streamlink twitch.tv/snopey best --stream-url > /dev/null 2>&1; then
-            echo "Canal online! Iniciando gravacao sincronizada por no maximo 5h20m..."
+          if streamlink twitch.tv/marselu1 best --stream-url > /dev/null 2>&1; then
+            echo "Canal online! Iniciando gravacao sincronizada de teste (2 minutos)..."
             python gravador3.py &
             CHAT_PID=$!
             sleep 3
-            timeout -s INT 320m streamlink twitch.tv/snopey best --twitch-disable-hosting --twitch-low-latency -o "snopey_${DATA}.mp4" || true
+            timeout -s INT 2m streamlink twitch.tv/marselu1 best --twitch-disable-hosting --twitch-low-latency -o "marselu1_${DATA}.mp4" || true
             
             kill -SIGINT $CHAT_PID 2>/dev/null || true
             sleep 5 
